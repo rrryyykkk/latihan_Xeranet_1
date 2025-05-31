@@ -7,6 +7,7 @@ import sanitazeMiddleware from "./middleware/sanitazeMiddleware.js";
 import authRoutes from "./routes/auth.routes.js";
 import blogRoutes from "./routes/blog.routes.js";
 import logoPTRoutes from "./routes/logoPT.routes.js";
+import testimoniRoutes from "./routes/testimoni.routes.js";
 
 dotenv.config(); // <- harus dipanggil sebelum pakai .env
 
@@ -23,6 +24,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/logoPT", logoPTRoutes);
+app.use("/api/testimoni", testimoniRoutes);
 
 const PORT = process.env.PORT || 3000;
 

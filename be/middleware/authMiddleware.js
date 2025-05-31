@@ -12,6 +12,7 @@ export const verifyToken = (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized: Invalid token" });
 
     req.userId = decoded.id;
+    req.user = decoded;
     next();
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error" });
@@ -20,8 +21,9 @@ export const verifyToken = (req, res, next) => {
 
 export const verifyAdmin = (req, res, next) => {
   try {
-    if (req.user.role !== "admin")
+    if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Forbidden: Not admin" });
+    }
     next();
   } catch (error) {
     console.log(error);

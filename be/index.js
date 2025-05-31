@@ -5,6 +5,8 @@ import connectDB from "./config/db.js";
 import sanitazeMiddleware from "./middleware/sanitazeMiddleware.js";
 // Routes
 import authRoutes from "./routes/auth.routes.js";
+import blogRoutes from "./routes/blog.routes.js";
+import logoPTRoutes from "./routes/logoPT.routes.js";
 
 dotenv.config(); // <- harus dipanggil sebelum pakai .env
 
@@ -16,7 +18,11 @@ app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(sanitazeMiddleware);
 
+// api
 app.use("/api/auth", authRoutes);
+app.use("/api/blog", blogRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/logoPT", logoPTRoutes);
 
 const PORT = process.env.PORT || 3000;
 

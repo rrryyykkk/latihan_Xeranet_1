@@ -83,29 +83,27 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    console.time("login");
     const { email, password } = req.body;
     // cek apakah ad field email dan password
-    console.time("emailPassword:");
+
     if (!email || !password) {
       return res
         .status(400)
         .json({ message: "Email and password are required" });
     }
-    console.timeEnd("emailPassword:");
 
     // cek user berdasarkan email
-    console.time("findOne:");
+
     const user = await User.findOne({ email });
     if (!user)
       return res.status(401).json({ message: "Email or Password is invalid" });
-    console.timeEnd("findOne:");
+
     // bandingkan password
-    console.time("pw:");
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(401).json({ message: "Email or Password is invalid" });
-    console.timeEnd("pw:");
+
     // Generate JWT
     const token = jwt.sign(
       { id: user._id, role: user.role },
@@ -133,7 +131,6 @@ export const login = async (req, res) => {
         role: user.role,
       },
     });
-    console.timeEnd("login");
   } catch (error) {
     console.log("Login Error:", error);
     res.status(500).json({ message: "Internal Server Error" });

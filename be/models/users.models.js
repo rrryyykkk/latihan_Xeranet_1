@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema(
       default: "null",
     },
     is2FaEnable: { type: Boolean, default: false },
+    refreshToken: { type: String },
   },
   { timestamps: true }
 );

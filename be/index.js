@@ -2,6 +2,9 @@ import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js";
+// Middleware security
+import helmet from "helmet";
+import { setCsp } from "./middleware/csp.js";
 import sanitazeMiddleware from "./middleware/sanitazeMiddleware.js";
 // Routes
 import authRoutes from "./routes/auth.routes.js";
@@ -18,6 +21,15 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(sanitazeMiddleware);
+
+// csp header
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  })
+);
+
+app.use(setCsp);
 
 // api
 app.use("/api/auth", authRoutes);

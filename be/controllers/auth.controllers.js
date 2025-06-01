@@ -179,6 +179,14 @@ export const login = async (req, res) => {
     //         </p>
     //       </div>`,
     //   });
+
+    //   // kirim response untuk arahkan user ke halaman otp
+
+    //   return res.status(200).json({
+    //     message: "Login successful, please verify your OTP code",
+    //     is2FaEnable: true,
+    //     uid: user._id,
+    //   });
     // }
 
     // set token dalam cookie httponly
@@ -319,6 +327,11 @@ export const verify2FA = async (req, res) => {
     user.refreshToken = refreshToken;
 
     await user.save();
+
+    // simpan refresh token ke redis (gunakan userId sebagai key)
+    await redisClient.set(`refreshToken:${user._id}`, refreshToken, {
+      EX: 7 * 24 * 60 * 60, // 7 hari
+    });
 
     // pasang ke cookie
     res.cookie("token", accessToken, {

@@ -12,24 +12,24 @@ export const register = async (req, res) => {
       req.body;
 
     // verifikasi CAPTCHA harus connect dari fe kalau mau test
-    if (!captchaToken) {
-      return res.status(400).json({ message: "Captcha is required" });
-    }
+    // if (!captchaToken) {
+    //   return res.status(400).json({ message: "Captcha is required" });
+    // }
 
-    const verifyCaptcha = await axios.post(
-      `https://www.google.com/recaptcha/api/siteverify`,
-      {},
-      {
-        params: {
-          secret: process.env.RECAPTCHA_SECRET_KEY,
-          response: captchaToken,
-        },
-      }
-    );
+    // const verifyCaptcha = await axios.post(
+    //   `https://www.google.com/recaptcha/api/siteverify`,
+    //   {},
+    //   {
+    //     params: {
+    //       secret: process.env.RECAPTCHA_SECRET_KEY,
+    //       response: captchaToken,
+    //     },
+    //   }
+    // );
 
-    if (!verifyCaptcha.data.success || !verifyCaptcha.data.score < 0.5) {
-      return res.status(403).json({ message: "Failed CAPTCHA verification" });
-    }
+    // if (!verifyCaptcha.data.success || !verifyCaptcha.data.score < 0.5) {
+    //   return res.status(403).json({ message: "Failed CAPTCHA verification" });
+    // }
 
     // validasi email
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;

@@ -49,14 +49,10 @@ export const getBlogById = async (req, res) => {
 // ✅ CREATE Blog
 export const createBlog = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      author,
-      blogImage: blogImageUrl,
-      status,
-    } = req.body;
+    const { title, description, blogImage: blogImageUrl, status } = req.body;
     let blogImage = "";
+
+    const author = req.body.author || "admin";
 
     if (req.file) {
       const result = await uploadToCloudinary(

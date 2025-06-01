@@ -8,11 +8,15 @@ export const verifyToken = (req, res, next) => {
   try {
     // verifikasi token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("decoded:", decoded);
     if (!decoded)
       return res.status(401).json({ message: "Unauthorized: Invalid token" });
 
     req.userId = decoded.id;
     req.user = decoded;
+    console.log("req.user:", req.user);
+    console.log("req.userId:", req.userId);
+    console.log("req.user.role:", req.user?.role);
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {

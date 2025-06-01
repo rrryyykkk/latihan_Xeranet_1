@@ -21,7 +21,7 @@ export const createTestimoni = async (req, res) => {
   try {
     let { authorImage, description, ratting, status } = req.body;
 
-    const author = req.body.author || req.user.name || "admin";
+    const author = req.body.author || "admin";
 
     if (!author || !description || !ratting)
       return res.status(400).json({ message: "All fields are required" });

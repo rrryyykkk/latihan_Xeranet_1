@@ -11,7 +11,6 @@ export const uploadToCloudinary = async (
 ) => {
   return new Promise(async (resolve, reject) => {
     if (!fileBuffer) {
-      console.log("File buffer is empty");
       return reject(new Error("File buffer is empty"));
     }
 

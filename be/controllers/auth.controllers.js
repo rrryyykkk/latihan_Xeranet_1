@@ -7,21 +7,33 @@ import { sendEmail } from "../utils/nodemailer.js";
 import redisClient from "../config/redis.js";
 import crypto from "crypto";
 import mongoose from "mongoose";
+import {
+  isValidImageUrl,
+  uploadToCloudinary,
+} from "../utils/uploadToCloudinary.js";
 
 // validasi password (harus ad huruf besar, huruf kecil, angka, dan spesial karakter)
 const passwordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,64}$/;
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$/;
 
 // validasi email
 const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 export const register = async (req, res) => {
-  res.setHeader("cache-control", "no-cache, no-store, must-revalidate"); // browser tidak menyimpan data apapun di cache, harus validasi ulang setiap request
+  // browser tidak menyimpan data apapun di cache, harus validasi ulang setiap request
+  res.setHeader("cache-control", "no-cache, no-store, must-revalidate");
   res.setHeader("pragma", "no-cache");
   res.setHeader("expires", "0");
   try {
-    const { userName, fullName, email, password, role, captchaToken } =
-      req.body;
+    const {
+      userName,
+      fullName,
+      email,
+      password,
+      role,
+      captchaToken,
+      avatarUrl,
+    } = req.body;
 
     // validasi req.body yg hars di isi
     if (!userName || !fullName || !email || !password) {
@@ -67,9 +79,30 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: "Email already exists" });
     }
 
+    // validasi avatar
+    const file = req.file;
+    let finalAvatarUrl = avatarUrl;
+
+    if (avatarUrl) {
+      if (!isValidImageUrl(avatarUrl)) {
+        return res.status(400).json({ message: "Invalid avatar URL" });
+      }
+      finalAvatarUrl = avatarUrl;
+    } else if (file) {
+      try {
+        const uploadedFile = await uploadToCloudinary(
+          file.buffer,
+          file,
+          "avatars"
+        );
+        finalAvatarUrl = uploadedFile.url;
+      } catch (error) {
+        return res.status(500).json({ message: "Failed to upload avatar" });
+      }
+    }
+
     // validasi role
     let assignedRole = "user";
-
     if (role && ["user", "admin"].includes(role)) {
       assignedRole = role;
     }
@@ -84,6 +117,7 @@ export const register = async (req, res) => {
       password: hashedPassword,
       fullName,
       role: assignedRole,
+      avatar: finalAvatarUrl,
     });
     await newUser.save();
 

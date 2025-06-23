@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.post("/register", rateLimiter, register);
 router.post("/login", rateLimiter, login);
-router.post("/logout", logout);
+router.post("/logout", verifyToken, logout);
 router.post("/refresh-token", refreshToken);
 router.get("/me", verifyToken, getMe);
 

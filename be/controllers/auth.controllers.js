@@ -5,11 +5,28 @@ import { generateRefreshToken, generateToken } from "../utils/token.js";
 import axios from "axios";
 import { sendEmail } from "../utils/nodemailer.js";
 import redisClient from "../config/redis.js";
+import crypto from "crypto";
+import mongoose from "mongoose";
+
+// validasi password (harus ad huruf besar, huruf kecil, angka, dan spesial karakter)
+const passwordRegex =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,64}$/;
+
+// validasi email
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 export const register = async (req, res) => {
+  res.setHeader("cache-control", "no-cache, no-store, must-revalidate"); // browser tidak menyimpan data apapun di cache, harus validasi ulang setiap request
+  res.setHeader("pragma", "no-cache");
+  res.setHeader("expires", "0");
   try {
     const { userName, fullName, email, password, role, captchaToken } =
       req.body;
+
+    // validasi req.body yg hars di isi
+    if (!userName || !fullName || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
 
     // verifikasi CAPTCHA harus connect dari fe kalau mau test
     // if (!captchaToken) {
@@ -32,33 +49,32 @@ export const register = async (req, res) => {
     // }
 
     // validasi email
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Email is not valid" });
     }
 
-    // validasi minimal password
-
-    if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters" });
+    // validasi password
+    if (!passwordRegex.test(password) || password.length < 8) {
+      return res.status(400).json({
+        message:
+          "Password must contain at least 8 characters,with uppercase, lowercase,  number, and special character",
+      });
     }
 
     // cek email udah ada yg pake apa belum
-
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "Email already exists" });
     }
 
     // validasi role
+    let assignedRole = "user";
 
-    const roleOptions = ["user", "admin"];
-    const isValidRole = roleOptions.includes(role) ? role : "user";
+    if (role && ["user", "admin"].includes(role)) {
+      assignedRole = role;
+    }
 
     // hash password
-
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // buat user
@@ -67,7 +83,7 @@ export const register = async (req, res) => {
       email,
       password: hashedPassword,
       fullName,
-      role: isValidRole,
+      role: assignedRole,
     });
     await newUser.save();
 
@@ -76,7 +92,7 @@ export const register = async (req, res) => {
       { id: newUser._id, role: newUser.role },
       process.env.JWT_SECRET,
       {
-        expiresIn: "1d",
+        expiresIn: "15m",
       }
     );
 
@@ -85,7 +101,7 @@ export const register = async (req, res) => {
       httpOnly: true,
       secure: false, // ganti true jika menggunakan https
       sameSite: "strict",
-      maxAge: 24 * 60 * 60 * 1000, // 1 hari
+      maxAge: 12 * 60 * 60 * 1000, // 12 jam
     });
 
     res
@@ -98,6 +114,10 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
+  // browser tidak menyimpan data apapun di cache, harus validasi ulang setiap request
+  res.setHeader("cache-control", "no-cache, no-store, must-revalidate");
+  res.setHeader("pragma", "no-cache");
+  res.setHeader("expires", "0");
   try {
     const { email, password } = req.body;
 
@@ -119,6 +139,19 @@ export const login = async (req, res) => {
 
     // if (!verifyCaptcha.data.success || !verifyCaptcha.data.score < 0.5) {
     //   return res.status(403).json({ message: "Failed CAPTCHA verification" });
+    // }
+
+    // cek validasi email
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Email is not valid" });
+    }
+
+    // cek validasi password nnti diaktifkan jika sudah di test
+    // if (!passwordRegex.test(password) || password.length < 8) {
+    //   return res.status(400).json({
+    //     message:
+    //       "Password must contain at least 8 characters,with uppercase, lowercase,  number, and special character",
+    //   });
     // }
 
     // cek apakah ad field email dan password
@@ -200,7 +233,7 @@ export const login = async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari
+      maxAge: 60 * 60 * 1000, // 1 jam
     });
 
     // simpan refresh token di db
@@ -209,10 +242,8 @@ export const login = async (req, res) => {
 
     // simpan token ke redis untuk chace
     await redisClient.set(`refreshToken:${user._id}`, refreshToken, {
-      EX: 7 * 24 * 60 * 60,
+      EX: 60 * 60, // 1 jam
     });
-    console.log("refreshToken:", refreshToken);
-    console.log("Login Success");
 
     res.status(200).json({
       message: "Login successful",
@@ -221,10 +252,11 @@ export const login = async (req, res) => {
         userName: user.userName,
         fullName: user.fullName,
         role: user.role,
+        email: user.email,
       },
     });
   } catch (error) {
-    console.log("Login Error:", error);
+    console.log("Login Error:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -232,11 +264,23 @@ export const login = async (req, res) => {
 export const getMe = async (req, res) => {
   try {
     const userId = req.userId;
+
+    // validasi format MongoDB objectId
+    if (!mongoose.Types.ObjectId.isValid(userId))
+      return res.status(400).json({ message: "Invalid user id" });
+
+    // ambil data user tanpa password
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.status(200).json(user);
+    res.status(200).json({
+      id: user._id,
+      userName: user.userName,
+      fullName: user.fullName,
+      role: user.role,
+      email: user.email,
+    });
   } catch (error) {
-    console.log("Get Me Error:", error);
+    console.log("Get Me Error:", error.message);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -245,47 +289,69 @@ export const logout = async (req, res) => {
   try {
     const token = req.cookies.token;
     const refreshToken = req.cookies.refreshToken;
+    // pastikan 2 token ada
+    if (!token || !refreshToken)
+      return res.status(401).json({ message: "Unauthorized: No token" });
+
+    // hapus token di db
     if (token && refreshToken) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       await User.findByIdAndUpdate(decoded.id, { refreshToken: null });
       // hapus token di redis
       await redisClient.del(`refreshToken:${decoded.id}`);
     }
-    res.clearCookie("token");
-    res.clearCookie("refreshToken");
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: false, // ganti true jika menggunakan https
+      sameSite: "strict",
+    });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: false, // ganti true jika menggunakan https
+      sameSite: "strict",
+    });
 
     res.status(200).json({ message: "Logout successful" });
   } catch (error) {
-    console.log("Logout Error:", error);
+    console.log("Logout Error:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
 export const refreshToken = async (req, res) => {
-  const token = req.cookies.refreshToken;
-  if (!token) res.status(401).json({ message: "Unauthorized: No token" });
-  console.log("token:", token);
-
+  const oldToken = req.cookies.refreshToken;
+  if (!oldToken) res.status(401).json({ message: "Unauthorized: No token" });
+  console.log("token:", oldToken); // dihapus saat fiks
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(oldToken, process.env.JWT_SECRET);
     console.log("decoded:", decoded);
     if (!decoded)
       return res.status(401).json({ message: "Unauthorized: Invalid token" });
 
-    // const user = await User.findById(decoded.id);
-
-    // if (!user || user.refreshToken !== token) {
-    //   return res.status(401).json({ message: "Unauthorized: User not found" });
-    // }
-
     // jika pakai redis untuk cache
     const storageToken = await redisClient.get(`refreshToken:${decoded.id}`);
     console.log("storageToken:", storageToken);
-    if (!storageToken || storageToken !== token)
+    if (!storageToken || storageToken !== oldToken)
       return res.status(401).json({ message: "Unauthorized: Token not found" });
 
+    // rotasi refresh token
+    await redisClient.del(`refreshToken:${decoded.id}`);
+
+    // generate new access token
+    // const user = await User.findById(decoded.id);
+
+    // if (!user ) {
+    //   return res.status(401).json({ message: "Unauthorized: User not found" });
+    // }
+
     const newAccessToken = generateToken(decoded);
+    const newRefreshToken = generateRefreshToken(decoded);
     console.log("New Access Token:", newAccessToken);
+    console.log("New Refresh Token:", newRefreshToken);
+
+    await redisClient.set(`refreshToken:${decoded.id}`, newAccessToken, {
+      EX: 60 * 60, // 1 jam
+    });
 
     res.cookie("token", newAccessToken, {
       httpOnly: true,
@@ -294,9 +360,16 @@ export const refreshToken = async (req, res) => {
       maxAge: 15 * 60 * 1000, // 15 menit
     });
 
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: false, // ganti true jika menggunakan https
+      sameSite: "strict",
+      maxAge: 60 * 60 * 1000, // 1 jam
+    });
+
     return res.status(200).json({ message: "Refresh token successful" });
   } catch (error) {
-    console.log("Refresh Token Error:", error);
+    console.log("Refresh Token Error:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -304,17 +377,17 @@ export const refreshToken = async (req, res) => {
 export const verify2FA = async (req, res) => {
   try {
     const { uid, otp } = req.body;
-    const user = await User.findById(uid);
 
+    if (!uid || !otp || typeof otp !== "string" || otp.length !== 6) {
+      return res.status(400).json({ message: "invalid request" });
+    }
+    const user = await User.findById(uid);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    if (user.otp !== otp) {
-      return res.status(400).json({ message: "Invalid OTP" });
-    }
 
-    if (user.otpExpiry < Date.now()) {
-      return res.status(400).json({ message: "OTP expired" });
+    if (!user.otp || !otp.otpExpiry || user.otpExpiry < Date.now()) {
+      return res.status(400).json({ message: "OTP expired or invalid" });
     }
 
     // bersihkan opt
@@ -330,7 +403,7 @@ export const verify2FA = async (req, res) => {
 
     // simpan refresh token ke redis (gunakan userId sebagai key)
     await redisClient.set(`refreshToken:${user._id}`, refreshToken, {
-      EX: 7 * 24 * 60 * 60, // 7 hari
+      EX: 60 * 60, // 1 jam
     });
 
     // pasang ke cookie
@@ -344,7 +417,7 @@ export const verify2FA = async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari
+      maxAge: 60 * 60 * 1000, // 1 jam
     });
 
     res.status(200).json({
@@ -354,6 +427,7 @@ export const verify2FA = async (req, res) => {
         userName: user.userName,
         fullName: user.fullName,
         role: user.role,
+        email: user.email,
       },
     });
   } catch (error) {

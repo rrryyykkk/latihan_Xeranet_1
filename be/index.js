@@ -5,7 +5,7 @@ import connectDB from "./config/db.js";
 // Middleware security
 import helmet from "helmet";
 import { setCsp } from "./middleware/csp.js";
-import sanitazeMiddleware from "./middleware/sanitazeMiddleware.js";
+import { sanitazeMiddleware } from "./middleware/sanitazeMiddleware.js";
 // Routes
 import authRoutes from "./routes/auth.routes.js";
 import blogRoutes from "./routes/blog.routes.js";
@@ -34,7 +34,6 @@ app.use(setCsp);
 // api
 app.use("/api/auth", authRoutes);
 app.use("/api/blog", blogRoutes);
-app.use("/api/auth", authRoutes);
 app.use("/api/logoPT", logoPTRoutes);
 app.use("/api/testimoni", testimoniRoutes);
 
